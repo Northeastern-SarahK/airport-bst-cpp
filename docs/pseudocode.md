@@ -1,661 +1,497 @@
-Airport Binary Search Tree – Pseudocode
-Task 1: Load the Data and Build the Tree
+# Task 1 : Load the data and build the tree (insert)
 
-Read airports.dat line by line, split each line into fields, and account for airport names that may contain commas inside quotation marks. Skip records whose IATA code is \N and store the remaining records in an array or vector of Airport.
+**(a)** Read airports.dat line by line, split each line into fields (careful: names can contain commas inside quotes), skip lines whose IATA code is \N, and store the records in an array (or vector) of Airport.
 
-1.1 Split a Line into Fields
+**Pseudocode:**
 
-Pseudocode:
-
-text
+```
 function splitLine(line)
-    fields = []
-    field = ""
-    insideQuotes = false
-
-    for i = 0 to line.length() - 1
-        if line[i] = '"'
-            insideQuotes = NOT insideQuotes
-        else if line[i] = ',' AND insideQuotes = false
-            fields.push_back(field)
-            field = ""
-        else
-            field = field + line[i]
-
-    fields.push_back(field)
-    return fields
+1: fields = []
+2: field = “”
+3: insideQuotes = false
+4: for i=0, i < line.length()
+5:     if line[i] = '"'
+6:         insideQuotes = !insideQuotes
+7:     else if line[i] = ',' AND insideQuotes = false
+8:         fields.push_back(field)
+9:         field = ""
+10:    else
+11:        field = field + line[i]
+12: fields.push_back(field)
+13: return fields
 end function
+```
 
-1.2 Load Airport Records
-
-Pseudocode:
-
-text
+```
 function loadAirports(lines, airports)
-    for i = 0 to lines.size() - 1
-        fields = splitLine(lines[i])
-
-        if fields[4] = "\N"
-            continue
-
-        Airport a
-        a.name = fields[1]
-        a.city = fields[2]
-        a.country = fields[3]
-        a.iata = fields[4]
-        a.icao = fields[5]
-        a.latitude = fields[6]
-        a.longitude = fields[7]
-
-        airports.push_back(a)
+1: for i=0, i < lines.size()
+2:     fields = splitLine(lines[i])
+3:     if fields[4] = "\N"
+4:         continue
+5:     Airport a
+6:     a.name = fields[1]
+7:     a.city = fields[2]
+8:     a.country = fields[3]
+9:     a.iata = fields[4]
+10:    a.icao = fields[5]
+11:    a.latitude = fields[6]
+12:    a.longitude = fields[7]
+13:    airports.push_back(a)
 end function
+```
 
-1.3 Insert Records and Build the BST
+**(b)** Build the BST by inserting the records in file order. Count how many keys were inserted and report any duplicate (rule I4).
 
-Build the BST by inserting the airport records in their original file order. Count the number of successfully inserted keys and report duplicates according to rule I4.
+**Pseudocode:**
 
-Pseudocode:
-
-text
+```
 function insert(AirportBST tree, Airport a)
-    if tree.root = NULL
-        tree.root = new Node(a)
-        return true
-
-    current = tree.root
-
-    while true
-        if a.iata < current.data.iata
-            if current.left = NULL
-                current.left = new Node(a)
-                return true
-            current = current.left
-
-        else if a.iata > current.data.iata
-            if current.right = NULL
-                current.right = new Node(a)
-                return true
-            current = current.right
-
-        else
-            return false
+1: if tree.root = NULL
+2:     tree.root = new Node(a)
+3:     return true
+4: current = tree.root
+5: while true
+6:     if a.iata < current.data.iata
+7:         if current.left = NULL
+8:             current.left = new Node(a)
+9:             return true
+10:        current = current.left
+11:    else if a.iata > current.data.iata
+12:        if current.right = NULL
+13:            current.right = new Node(a)
+14:            return true
+15:        current = current.right
+16:    else
+17:        return false
 end function
+```
 
-
-Build the tree:
-
-text
+```
 function buildTree(airports, tree)
-    inserted = 0
-    duplicates = 0
-
-    for i = 0 to airports.size() - 1
-        if insert(tree, airports[i]) = true
-            inserted++
-        else
-            duplicates++
-
-    return inserted, duplicates
+1: inserted = 0
+2: duplicates = 0
+3: for i=0, i < airports.size()
+4:     if insert(tree, airports[i]) = true
+5:         inserted++
+6:     else
+7:         duplicates++
+8: return inserted, duplicates
 end function
+```
 
-1.4 Calculate Tree Height and Average Depth
+**(c)** Report the height of the tree and the average depth of a node.
 
-Calculate height:
+**Pseudocode:**
 
-text
+```
 function height(Node* node)
-    if node = NULL
-        return -1
-
-    leftHeight = height(node.left)
-    rightHeight = height(node.right)
-
-    if leftHeight > rightHeight
-        return leftHeight + 1
-    else
-        return rightHeight + 1
+1: if node = NULL
+2:     return -1
+3: leftHeight = height(node.left)
+4: rightHeight = height(node.right)
+5: if leftHeight > rightHeight
+6:     return leftHeight + 1
+7: else
+8:     return rightHeight + 1
 end function
+```
 
-
-Calculate the depth of each node:
-
-text
+```
 function calculateDepth(Node* node, depth, totalDepth, count)
-    if node = NULL
-        return
-
-    totalDepth = totalDepth + depth
-    count++
-
-    calculateDepth(node.left, depth + 1, totalDepth, count)
-    calculateDepth(node.right, depth + 1, totalDepth, count)
+1: if node = NULL
+2:     return
+3: totalDepth = totalDepth + depth
+4: count++
+5: calculateDepth(node.left, depth + 1, totalDepth, count)
+6: calculateDepth(node.right, depth + 1, totalDepth, count)
 end function
+```
 
-
-Calculate average depth:
-
-text
+```
 function averageDepth(root)
-    totalDepth = 0
-    count = 0
-
-    calculateDepth(root, 0, totalDepth, count)
-
-    if count = 0
-        return 0
-
-    return totalDepth / count
+1: totalDepth = 0
+2: count = 0
+3: calculateDepth(root, 0, totalDepth, count)
+4: if count = 0
+5:     return 0
+6: return totalDepth / count
 end function
+```
 
-Task 2: Search
+# Task 2 : Search
 
-The find CODE command searches for an airport by its IATA code. It prints the airport information, the search path (every code compared), and the total number of comparisons.
+**(a)** find CODE prints the airport and the search path (every code compared) and the number of comparisons.
 
-2.1 Search for an Airport
+**Pseudocode:**
 
-Pseudocode:
-
-text
+```
 function search(code)
-    current = root
-    comparisons = 0
-    path = ""
-
-    while current != NULL
-        comparisons++
-        path = path + current.data.iata
-
-        if code = current.data.iata
-            print path
-            print comparisons
-            print airport information
-            return true
-
-        else if code < current.data.iata
-            current = current.left
-
-        else
-            current = current.right
-
-    print path
-    print comparisons
-    print "Airport not found"
-
-    return false
+1: current = root
+2: comparisons = 0
+3: path = ""
+4: while current != NULL
+5:     comparisons++
+6:     path = path + current.data.iata
+7:     if code = current.data.iata
+8:         print path
+9:         print comparisons
+10:        print airport information
+11:        return true
+12:    else if code < current.data.iata
+13:        current = current.left
+14:    else
+15:        current = current.right
+16: print path
+17: print comparisons
+18: print “Airport not found”
+19: return false
 end function
+```
 
+**(b)** Test every search case: the root, a leaf, a code deep in the tree, a code that does not exist (for example XYZ), a code smaller than every key and one larger than every key. Also print the minimum and maximum code.
 
-Test the following search cases:
+**Pseudocode:**
 
-Search for the root.
-Search for a leaf.
-Search for a code deep in the tree.
-Search for a code that does not exist (for example, XYZ).
-Search for a code smaller than every key.
-Search for a code larger than every key.
-
-Also print the minimum and maximum airport codes.
-
-2.2 Find the Minimum and Maximum Codes
-
-Find minimum:
-
-text
+```
 function findMin()
-    if root = NULL
-        return NULL
-
-    current = root
-
-    while current.left != NULL
-        current = current.left
-
-    return current.data.iata
+1: if root = NULL
+2:     return NULL
+3: current = root
+4: while current.left != NULL
+5:     current = current.left
+6: return current.data.iata
 end function
+```
 
-
-Find maximum:
-
-text
+```
 function findMax()
-    if root = NULL
-        return NULL
-
-    current = root
-
-    while current.right != NULL
-        current = current.right
-
-    return current.data.iata
+1: if root = NULL
+2:     return NULL
+3: current = root
+4: while current.right != NULL
+5:     current = current.right
+6: return current.data.iata
 end function
+```
 
-2.3 Find a Leaf Node
-text
+```
 function findLeaf(Node* node)
-    if node = NULL
-        return false
-
-    if node.left = NULL AND node.right = NULL
-        print node.data.iata
-        return true
-
-    if findLeaf(node.left) = true
-        return true
-
-    if findLeaf(node.right) = true
-        return true
-
-    return false
+1: if node = NULL
+2:     return false
+3: if node.left = NULL AND node.right = NULL
+4:     print node.data.iata
+5:     return true
+6: if findLeaf(node.left) = true
+7:     return true
+8: if findLeaf(node.right) = true
+9:     return true
+10: return false
 end function
+```
 
-2.4 Find the Deepest Node
-text
+```
 function findDeepest(Node* node, depth, maxDepth, code)
-    if node = NULL
-        return
-
-    if depth > maxDepth
-        maxDepth = depth
-        code = node.data.iata
-
-    findDeepest(node.left, depth + 1, maxDepth, code)
-    findDeepest(node.right, depth + 1, maxDepth, code)
+1: if node = NULL
+2:     return
+3: if depth > maxDepth
+4:     maxDepth = depth
+5:     code = node.data.iata
+6: findDeepest(node.left, depth + 1, maxDepth, code)
+7: findDeepest(node.right, depth + 1, maxDepth, code)
 end function
+```
 
-
-Get the deepest code:
-
-text
+```
 function getDeepestCode()
-    maxDepth = -1
-    code = ""
-
-    findDeepest(root, 0, maxDepth, code)
-
-    return code
+1: maxDepth = -1
+2: code = ""
+3: findDeepest(root, 0, maxDepth, code)
+4: return code
 end function
+```
 
-Task 3: Delete
+# Task 3 : Delete
 
-The remove CODE command deletes an airport from the BST. The deletion algorithm handles the three standard BST deletion cases:
+**(a)** remove CODE deletes an airport (for example when it closes) using the three deletion cases.
 
-A node with no children (leaf).
-A node with one child.
-A node with two children.
-3.1 Find the Inorder Successor
-text
+**Pseudocode:**
+
+```
 function findSuccessor(Node* node)
-    current = node.right
-
-    while current.left != NULL
-        current = current.left
-
-    return current
+1: current = node.right
+2: while current.left != NULL
+3:     current = current.left
+4: return current
 end function
+```
 
-3.2 Remove an Airport
-text
+```
 function remove(code)
-    current = root
-    parent = NULL
-
-    while current != NULL AND current.data.iata != code
-        parent = current
-
-        if code < current.data.iata
-            current = current.left
-        else
-            current = current.right
-
-    if current = NULL
-        return false
-
-    // Case 1: Node has no children
-    if current.left = NULL AND current.right = NULL
-        if current = root
-            root = NULL
-        else if parent.left = current
-            parent.left = NULL
-        else
-            parent.right = NULL
-
-        delete current
-
-    // Case 2: Node has one child
-    else if current.left = NULL OR current.right = NULL
-        if current.left != NULL
-            child = current.left
-        else
-            child = current.right
-
-        if current = root
-            root = child
-        else if parent.left = current
-            parent.left = child
-        else
-            parent.right = child
-
-        delete current
-
-    // Case 3: Node has two children
-    else
-        successor = findSuccessor(current)
-        successorParent = current
-
-        while successorParent.left != successor
-            successorParent = successorParent.left
-
-        current.data = successor.data
-
-        if successor.right != NULL
-            successorParent.left = successor.right
-        else
-            successorParent.left = NULL
-
-        delete successor
-
-    return true
+1: current = root
+2: parent = NULL
+3: while current != NULL AND current.data.iata != code
+4:     parent = current
+5:     if code < current.data.iata
+6:         current = current.left
+7:     else
+8:         current = current.right
+9: if current = NULL
+10:    return false
+11: if current.left = NULL AND current.right = NULL
+12:    if current = root
+13:        root = NULL
+14:    else if parent.left = current
+15:        parent.left = NULL
+16:    else
+17:        parent.right = NULL
+18:    delete current
+19: else if current.left = NULL OR current.right = NULL
+20:    if current.left != NULL
+21:        child = current.left
+22:    else
+23:        child = current.right
+24:    if current = root
+25:        root = child
+26:    else if parent.left = current
+27:        parent.left = child
+28:    else
+29:        parent.right = child
+30:    delete current
+31: else
+32:    successor = findSuccessor(current)
+33:    successorParent = current
+34:    while successorParent.left != successor
+35:        successorParent = successorParent.left
+36:    current.data = successor.data
+37:    if successor.right != NULL
+38:        successorParent.left = successor.right
+39:    else
+40:        successorParent.left = NULL
+41:    delete successor
+42: return true
 end function
+```
 
+**(b)** Find, in your tree, one code for each case and test it: a leaf (D1), a node with only a left child, a node with only a right child (D2), a node with two children (D3) and the root. Print the level order of the top three levels before and after each delete.
 
-Find one airport code for each deletion case and test it:
+**Pseudocode:**
 
-A leaf node (D1).
-A node with only a left child.
-A node with only a right child (D2).
-A node with two children (D3).
-The root node.
-
-Print the level order of the top three levels before and after each deletion.
-
-3.3 Print Level Order
-text
+```
 function printLevelOrder()
-    if root = NULL
-        print "Tree is empty"
-        return
-
-    queue = [root]
-    index = 0
-    level = 0
-
-    while index < queue.size() AND level < 3
-        levelSize = queue.size() - index
-
-        for i = 0 to levelSize - 1
-            current = queue[index]
-
-            print current.data.iata
-
-            if current.left != NULL
-                queue.push_back(current.left)
-
-            if current.right != NULL
-                queue.push_back(current.right)
-
-            index++
-
-        level++
+1: if root = NULL
+2:     print "Tree is empty"
+3:     return
+4: queue = [root]
+5: level = 0
+6: while queue is not empty AND level < 3
+7:     levelSize = queue.size() - index
+8:     for i=0, i < levelSize
+9:         current = queue[index]
+10:        print current.data.iata
+11:        if current.left != NULL
+12:            queue.push_back(current.left)
+13:        if current.right != NULL
+14:            queue.push_back(current.right)
+15:        index++
+16:    level++
 end function
+```
 
-3.4 Test Deletion
-text
+```
 function testDeletion(code)
-    print "Before deletion"
-    printLevelOrder()
-
-    remove(code)
-
-    print "After deletion"
-    printLevelOrder()
+1: print "Before deletion"
+2: printLevelOrder()
+3: remove(code)
+4: print "After deletion"
+5: printLevelOrder()
 end function
+```
 
+**(c)** add a made-up airport (code QQQ, your own name and city) and show it can be found, then removed.
 
-Also add a made-up airport with the IATA code QQQ, using your own airport name and city. Demonstrate that the airport can be found using search and then successfully removed.
+# Task 4 : Traversals and validation
 
-Task 4: Traversals and Validation
+**(a)** list prints every airport in alphabetical code order (inorder). Check that it is sorted.
 
-The list command prints every airport in alphabetical IATA code order using inorder traversal. Check that the resulting codes are sorted.
+**Pseudocode:**
 
-4.1 Inorder Traversal
-text
+```
 function inorder(Node* node)
-    if node = NULL
-        return
-
-    inorder(node.left)
-    print node.data.iata
-    inorder(node.right)
+1: if node = NULL
+2:     return
+3: inorder(node.left)
+4: print node.data.iata
+5: inorder(node.right)
 end function
+```
 
-4.2 Check That the Codes Are Sorted
-text
+```
 function checkSorted(codes)
-    for i = 1 to codes.size() - 1
-        if codes[i] < codes[i - 1]
-            return false
-
-    return true
+1: for i=1, i < codes.size()
+2:     if codes[i] < codes[i-1]
+3:         return false
+4: return true
 end function
+```
 
-4.3 Save and Load the Tree
+**(b)** save FILE writes the codes in preorder; load FILE rebuilds the tree from that file. Show that the reloaded tree has the same shape (same height and level order).
 
-The save FILE command writes the airport codes in preorder. The load FILE command rebuilds the tree from the saved file.
+**Pseudocode:**
 
-Show that the reloaded tree has the same shape by comparing its height and level order.
-
-Preorder traversal:
-
-text
+```
 function preorder(Node* node, file)
-    if node = NULL
-        return
-
-    write node.data to file
-
-    preorder(node.left, file)
-    preorder(node.right, file)
+1: if node = NULL
+2:     return
+3: write node.data to file
+4: preorder(node.left, file)
+5: preorder(node.right, file)
 end function
+```
 
-
-Save the tree:
-
-text
+```
 function saveTree(filename)
-    file = open(filename, write)
-
-    if file = NULL
-        return false
-
-    preorder(root, file)
-
-    close(file)
-    return true
+1: file = open(filename, write)
+2: if file = NULL
+3:     return false
+4: preorder(root, file)
+5: close(file)
+6: return true
 end function
+```
 
-
-Load the tree:
-
-text
+```
 function loadTree(filename)
-    file = open(filename, read)
-
-    if file = NULL
-        return false
-
-    clearTree(root)
-
-    while file has data
-        read airport record
-        insert(airport)
-
-    close(file)
-    return true
+1: file = open(filename, read)
+2: if file = NULL
+3:     return false
+4: clearTree(root)
+5: while file has data
+6:     read airport record
+7:     insert(airport)
+8: close(file)
+9: return true
 end function
+```
 
-4.4 Compare Two Trees
-text
+```
 function compareTrees(Node* first, Node* second)
-    if first = NULL AND second = NULL
-        return true
-
-    if first = NULL OR second = NULL
-        return false
-
-    if first.data.iata != second.data.iata
-        return false
-
-    leftSame = compareTrees(first.left, second.left)
-    rightSame = compareTrees(first.right, second.right)
-
-    return leftSame AND rightSame
+1: if first = NULL AND second = NULL
+2:     return true
+3: if first = NULL OR second = NULL
+4:     return false
+5: if first.data.iata != second.data.iata
+6:     return false
+7: leftSame = compareTrees(first.left, second.left)
+8: rightSame = compareTrees(first.right, second.right)
+9: return leftSame AND rightSame
 end function
+```
 
-4.5 Validate the BST
+**(c)** validate checks the BST property with the range (lo, hi) method after every insert and delete in your tests.
 
-The validate command checks the BST property using the range (lo, hi) method. Validation should be performed after every insert and delete in the tests.
+**Pseudocode:**
 
-text
+```
 function validate(Node* node, string lo, string hi)
-    if node = NULL
-        return true
-
-    if node.data.iata <= lo OR node.data.iata >= hi
-        return false
-
-    if validate(node.left, lo, node.data.iata) = false
-        return false
-
-    if validate(node.right, node.data.iata, hi) = false
-        return false
-
-    return true
+1: if node = NULL
+2:     return true
+3: if node.data.iata <= lo OR node.data.iata >= hi
+4:     return false
+5: if validate(node.left, lo, node.data.iata) = false
+6:     return false
+7: if validate(node.right, node.data.iata, hi) = false
+8:     return false
+9: return true
 end function
+```
 
-
-Validate the tree:
-
-text
+```
 function validateTree()
-    return validate(root, "", "ZZZ")
+1: return validate(root, "", "ZZZ")
 end function
+```
 
-Task 5: Range Queries
+# Task 5 : Range queries
 
-The range FROM TO command lists every airport with an IATA code between FROM and TO, inclusive.
+range FROM TO lists every airport with a code from FROM to TO, without visiting subtrees that are outside the range. Report how many nodes you visited. For example range BOS BWI must return 113 airports.
 
-The algorithm avoids visiting subtrees that cannot contain codes within the requested range. It also reports the number of nodes visited.
+**Pseudocode:**
 
-For example, range BOS BWI should return 113 airports.
-
-5.1 Range Search
-text
+```
 function rangeSearch(Node* node, string from, string to, int& visited)
-    if node = NULL
-        return
-
-    visited++
-
-    if node.data.iata > from
-        rangeSearch(node.left, from, to, visited)
-
-    if node.data.iata >= from AND node.data.iata <= to
-        print node.data.iata
-
-    if node.data.iata < to
-        rangeSearch(node.right, from, to, visited)
+1: if node = NULL
+2:     return
+3: visited++
+4: if node.data.iata > from
+5:     rangeSearch(node.left, from, to, visited)
+6: if node.data.iata >= from AND node.data.iata <= to
+7:     print node.data.iata
+8: if node.data.iata < to
+9:     rangeSearch(node.right, from, to, visited)
 end function
+```
 
-5.2 Execute a Range Query
-text
+```
 function range(from, to)
-    if from > to
-        print "Invalid range"
-        return
-
-    visited = 0
-
-    rangeSearch(root, from, to, visited)
-
-    print visited
+1: if from > to
+2:     print "Invalid range"
+3:     return
+4: visited = 0
+5: rangeSearch(root, from, to, visited)
+6: print visited
 end function
+```
 
-Task 6: The Shape Experiment
+# Task 6 : The shape experiment
 
-Build the BST in different ways using the same 6,072 airport codes:
+Build the tree in three ways from the same 6,072 codes and fill in the table: (1) file order, (2) sorted order, (3) balanced build from the sorted array (middle element as the root, a rebalance command). For each, also time 10,000 random searches.
 
-File order.
-Sorted order.
-Balanced build from the sorted array, using the middle element as the root.
-Random shuffle (bonus).
+**Pseudocode:**
 
-For each build method, measure the tree height, average node depth, and time required for 10,000 random searches.
-
-6.1 Build a Tree Using Sorted Order
-text
+```
 function buildSortedTree(airports)
-    sortedAirports = copy(airports)
-
-    sort(sortedAirports by iata)
-
-    tree = new AirportBST()
-
-    for i = 0 to sortedAirports.size() - 1
-        insert(tree, sortedAirports[i])
-
-    return tree
+1: sortedAirports = copy(airports)
+2: sort(sortedAirports by iata)
+3: tree = new AirportBST()
+4: for i = 0 to sortedAirports.size() - 1
+5:     insert(tree, sortedAirports[i])
+6: return tree
 end function
+```
 
-6.2 Build a Balanced Tree
-
-Use the middle element of the sorted array as the root. Recursively build the left and right subtrees using the elements on either side of the middle.
-
-text
+```
 function buildBalanced(sortedAirports, start, end)
-    if start > end
-        return NULL
-
-    mid = (start + end) / 2
-
-    node = new Node(sortedAirports[mid])
-
-    node.left = buildBalanced(sortedAirports, start, mid - 1)
-    node.right = buildBalanced(sortedAirports, mid + 1, end)
-
-    return node
+1: if start > end
+2:     return NULL
+3: mid = (start + end) / 2
+4: node = new Node(sortedAirports[mid])
+5: node.left = buildBalanced(sortedAirports, start, mid - 1)
+6: node.right = buildBalanced(sortedAirports, mid + 1, end)
+7: return node
 end function
+```
 
-6.3 Build a Tree Using Random Order
-text
+```
 function buildRandomTree(airports)
-    shuffledAirports = copy(airports)
-
-    shuffle(shuffledAirports)
-
-    tree = new AirportBST()
-
-    for i = 0 to shuffledAirports.size() - 1
-        insert(tree, shuffledAirports[i])
-
-    return tree
+1: shuffledAirports = copy(airports)
+2: shuffle(shuffledAirports)
+3: tree = new AirportBST()
+4: for i = 0 to shuffledAirports.size() - 1
+5:     insert(tree, shuffledAirports[i])
+6: return tree
 end function
+```
 
-6.4 Time 10,000 Random Searches
-text
+```
 function timeSearches(tree, airports)
-    total = 10000
-
-    indexes = generateRandomIndexes(airports.size(), total)
-
-    startTime = currentTime()
-
-    for i = 0 to total - 1
-        code = airports[indexes[i]].iata
-        search(tree, code)
-
-    endTime = currentTime()
-
-    elapsedTime = endTime - startTime
-
-    return elapsedTime
+1: total = 10000
+2: indexes = generateRandomIndexes(airports.size(), total)
+3: startTime = currentTime()
+4: for i = 0 to total - 1
+5:     code = airports[indexes[i]].iata
+6:     search(tree, code)
+7: endTime = currentTime()
+8: elapsedTime = endTime - startTime
+9: return elapsedTime
 end function
+```
