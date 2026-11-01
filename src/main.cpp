@@ -2,1531 +2,1417 @@
 #include <fstream>
 #include <string>
 #include <vector>
-#include <algorithm>
 #include <chrono>
 #include <cstdlib>
-#include <algorithm>
-#include <random>
-#include <chrono>
 using namespace std;
 
 //=====================================================
 
-class Airport
-{
+class Airport {
 public:
-	string name;
-	string city;
-	string country;
-	string iata;
-	string icao;
-	double latitude = 0.0;
-	double longitude = 0.0;
+    string id;
+    string name;
+    string city;
+    string country;
+    string iata;
+    string icao;
+    double latitude;
+    double longitude;
+
+    Airport() {
+        latitude = 0.0;
+        longitude = 0.0;
+    }
 };
 
 //=====================================================
 
-vector<string> splitLine(const string& line);
+vector<string> splitLine(string line) {
+    vector<string> fields;
+    string field = "";
+    bool insideQuotes = false;
+
+    for (int i = 0; i < (int)line.length(); i++) {
+        char c = line[i];
+        if (c == '"') {
+            insideQuotes = !insideQuotes;
+        } else if (c == ',' && insideQuotes == false) {
+            fields.push_back(field);
+            field = "";
+        } else {
+            field = field + c;
+        }
+    }
+    fields.push_back(field);
+
+    return fields;
+}
 
 //=====================================================
 
-class AirportBST
-{
+bool readFile(string fileName, vector<string> &lines) {
+    ifstream file(fileName);
+    if (!file) {
+        return false;
+    }
+
+    string line;
+    while (getline(file, line)) {
+        lines.push_back(line);
+    }
+    file.close();
+
+    return true;
+}
+
+//=====================================================
+
+void loadAirports(vector<string> &lines, vector<Airport> &airports, int &skipped) {
+    skipped = 0;
+
+    for (int i = 0; i < (int)lines.size(); i++) {
+        vector<string> fields = splitLine(lines[i]);
+
+        if ((int)fields.size() < 8) {
+            continue;
+        }
+
+        if (fields[4] == "\\N") {
+            skipped = skipped + 1;
+            continue;
+        }
+
+        Airport a;
+        a.id = fields[0];
+        a.name = fields[1];
+        a.city = fields[2];
+        a.country = fields[3];
+        a.iata = fields[4];
+        a.icao = fields[5];
+        a.latitude = stod(fields[6]);
+        a.longitude = stod(fields[7]);
+
+        airports.push_back(a);
+    }
+}
+
+//=====================================================
+
+class AirportBST {
 private:
+    struct Node {
+        Airport data;
+        Node* left;
+        Node* right;
 
-	struct Node
-	{
-		Airport data;
-		Node* left;
-		Node* right;
+        Node(Airport a) {
+            data = a;
+            left = nullptr;
+            right = nullptr;
+        }
+    };
 
-		Node(Airport a)
-		{
-			data = a;
-			left = nullptr;
-			right = nullptr;
-		}
-	};
+    Node* root;
 
-	int height(Node* node)
-	{
-		if (node == nullptr)
-		{
-			return -1;
-		}
+    void inorder(Node* node, vector<Airport> &result) {
+        if (node == nullptr) {
+            return;
+        }
+        inorder(node->left, result);
+        result.push_back(node->data);
+        inorder(node->right, result);
+    }
 
-		vector<Node*> queue;
-		queue.push_back(node);
+    void preorder(Node* node, ofstream &file) {
+        if (node == nullptr) {
+            return;
+        }
 
-		int height = -1;
-		int index = 0;
+        file << node->data.id << ",\""
+             << node->data.name << "\",\""
+             << node->data.city << "\",\""
+             << node->data.country << "\",\""
+             << node->data.iata << "\",\""
+             << node->data.icao << "\","
+             << node->data.latitude << ","
+             << node->data.longitude << endl;
 
-		while (index < queue.size())
-		{
-			int levelSize = (int)queue.size() - index;
+        preorder(node->left, file);
+        preorder(node->right, file);
+    }
 
-			for (int i = 0; i < levelSize; i++)
-			{
-				Node* current = queue[index];
+    bool compareTrees(Node* first, Node* second) {
+        if (first == nullptr && second == nullptr) {
+            return true;
+        }
+        if (first == nullptr || second == nullptr) {
+            return false;
+        }
+        if (first->data.iata != second->data.iata) {
+            return false;
+        }
 
-				if (current->left != nullptr)
-				{
-					queue.push_back(current->left);
-				}
+        bool leftSame = compareTrees(first->left, second->left);
+        bool rightSame = compareTrees(first->right, second->right);
 
-				if (current->right != nullptr)
-				{
-					queue.push_back(current->right);
-				}
+        return leftSame && rightSame;
+    }
 
-				index++;
-			}
+    bool validate(Node* node, string lo, string hi) {
+        if (node == nullptr) {
+            return true;
+        }
+        if (node->data.iata <= lo || node->data.iata >= hi) {
+            return false;
+        }
+        if (validate(node->left, lo, node->data.iata) == false) {
+            return false;
+        }
+        if (validate(node->right, node->data.iata, hi) == false) {
+            return false;
+        }
+        return true;
+    }
 
-			height++;
-		}
+    void rangeSearch(Node* node, string from, string to, int &visited, int &found) {
+        if (node == nullptr) {
+            return;
+        }
 
-		return height;
-	}
+        visited = visited + 1;
 
-	void calculateDepth(Node* node, int depth, int& totalDepth, int& count)
-	{
-		if (node == nullptr)
-		{
-			return;
-		}
+        if (node->data.iata > from) {
+            rangeSearch(node->left, from, to, visited, found);
+        }
 
-		vector<pair<Node*, int>> stack;
+        if (node->data.iata >= from && node->data.iata <= to) {
+            found = found + 1;
+            cout << node->data.iata << " "
+                 << node->data.name << ", "
+                 << node->data.city << ", "
+                 << node->data.country << endl;
+        }
 
-		stack.push_back({ node, depth });
+        if (node->data.iata < to) {
+            rangeSearch(node->right, from, to, visited, found);
+        }
+    }
 
-		while (!stack.empty())
-		{
-			pair<Node*, int> current = stack.back();
-			stack.pop_back();
+    Node* buildBalanced(vector<Airport> &sortedAirports, int start, int end) {
+        if (start > end) {
+            return nullptr;
+        }
 
-			Node* temp = current.first;
-			int currentDepth = current.second;
+        int mid = (start + end) / 2;
 
-			totalDepth += currentDepth;
-			count++;
+        Node* node = new Node(sortedAirports[mid]);
+        node->left = buildBalanced(sortedAirports, start, mid - 1);
+        node->right = buildBalanced(sortedAirports, mid + 1, end);
 
-			if (temp->right != nullptr)
-			{
-				stack.push_back({ temp->right, currentDepth + 1 });
-			}
+        return node;
+    }
 
-			if (temp->left != nullptr)
-			{
-				stack.push_back({ temp->left, currentDepth + 1 });
-			}
-		}
-	}
+    void findDeepest(Node* node, int depth, int &maxDepth, string &code) {
+        if (node == nullptr) {
+            return;
+        }
+        if (depth > maxDepth) {
+            maxDepth = depth;
+            code = node->data.iata;
+        }
+        findDeepest(node->left, depth + 1, maxDepth, code);
+        findDeepest(node->right, depth + 1, maxDepth, code);
+    }
 
-	Node* root = nullptr;
+    string findLeafCode(Node* node) {
+        if (node == nullptr) {
+            return "";
+        }
+        if (node->left == nullptr && node->right == nullptr) {
+            return node->data.iata;
+        }
 
-	bool findLeaf(Node* node)
-	{
-		if (node == nullptr)
-		{
-			return false;
-		}
+        string code = findLeafCode(node->left);
+        if (code != "") {
+            return code;
+        }
+        return findLeafCode(node->right);
+    }
 
-		if (node->left == nullptr && node->right == nullptr)
-		{
-			cout << "Leaf code: " << node->data.iata << '\n';
-			return true;
-		}
+    string findOnlyLeftChild(Node* node) {
+        if (node == nullptr) {
+            return "";
+        }
+        if (node->left != nullptr && node->right == nullptr) {
+            return node->data.iata;
+        }
 
-		if (findLeaf(node->left))
-		{
-			return true;
-		}
+        string code = findOnlyLeftChild(node->left);
+        if (code != "") {
+            return code;
+        }
+        return findOnlyLeftChild(node->right);
+    }
 
-		if (findLeaf(node->right))
-		{
-			return true;
-		}
+    string findOnlyRightChild(Node* node) {
+        if (node == nullptr) {
+            return "";
+        }
+        if (node->left == nullptr && node->right != nullptr) {
+            return node->data.iata;
+        }
 
-		return false;
-	}
+        string code = findOnlyRightChild(node->left);
+        if (code != "") {
+            return code;
+        }
+        return findOnlyRightChild(node->right);
+    }
 
-	void findDeepest(Node* node, int depth,
-		int& maxDepth, string& code)
-	{
-		if (node == nullptr)
-		{
-			return;
-		}
+    string findTwoChildren(Node* node) {
+        if (node == nullptr) {
+            return "";
+        }
+        if (node != root && node->left != nullptr && node->right != nullptr) {
+            return node->data.iata;
+        }
 
-		if (depth > maxDepth)
-		{
-			maxDepth = depth;
-			code = node->data.iata;
-		}
+        string code = findTwoChildren(node->left);
+        if (code != "") {
+            return code;
+        }
+        return findTwoChildren(node->right);
+    }
 
-		findDeepest(node->left, depth + 1, maxDepth, code);
-		findDeepest(node->right, depth + 1, maxDepth, code);
-	}
+    void calculateDepth(int &totalDepth, int &count) {
+        totalDepth = 0;
+        count = 0;
+        if (root == nullptr) {
+            return;
+        }
 
-	Node* findSuccessor(Node* node)
-	{
-		Node* current = node->right;
+        vector<Node*> nodeStack;
+        vector<int> depthStack;
+        nodeStack.push_back(root);
+        depthStack.push_back(0);
 
-		while (current->left != nullptr)
-		{
-			current = current->left;
-		}
+        while ((int)nodeStack.size() > 0) {
+            Node* current = nodeStack[nodeStack.size() - 1];
+            int depth = depthStack[depthStack.size() - 1];
+            nodeStack.pop_back();
+            depthStack.pop_back();
 
-		return current;
-	}
+            totalDepth = totalDepth + depth;
+            count = count + 1;
 
-	void inorder(Node* node, vector<string>& codes)
-	{
-		if (node == nullptr)
-		{
-			return;
-		}
-
-		inorder(node->left, codes);
-
-		codes.push_back(node->data.iata);
-
-		inorder(node->right, codes);
-	}
-
-	void preorder(Node* node, ofstream& file)
-	{
-		if (node == nullptr)
-		{
-			return;
-		}
-
-		file << '"'
-			<< node->data.name << "\",\""
-			<< node->data.city << "\",\""
-			<< node->data.country << "\",\""
-			<< node->data.iata << "\",\""
-			<< node->data.icao << "\",\""
-			<< node->data.latitude << "\",\""
-			<< node->data.longitude << "\"\n";
-
-		preorder(node->left, file);
-		preorder(node->right, file);
-	}
-
-	bool compareTrees(Node* first, Node* second)
-	{
-		if (first == nullptr && second == nullptr)
-		{
-			return true;
-		}
-
-		if (first == nullptr || second == nullptr)
-		{
-			return false;
-		}
-
-		if (first->data.iata != second->data.iata)
-		{
-			return false;
-		}
-
-		bool leftSame = compareTrees(first->left, second->left);
-		bool rightSame = compareTrees(first->right, second->right);
-
-		return leftSame && rightSame;
-	}
-
-	bool validate(Node* node, string min, string max)
-	{
-		if (node == nullptr)
-		{
-			return true;
-		}
-
-		if (node->data.iata <= min ||
-			node->data.iata >= max)
-		{
-			return false;
-		}
-
-		if (!validate(node->left, min, node->data.iata))
-		{
-			return false;
-		}
-
-		if (!validate(node->right, node->data.iata, max))
-		{
-			return false;
-		}
-
-		return true;
-	}
-
-	void rangeSearch(Node* node, string from, string to, int& visited)
-	{
-		if (node == nullptr)
-		{
-			return;
-		}
-
-		visited++;
-
-		if (node->data.iata > from)
-		{
-			rangeSearch(node->left, from, to, visited);
-		}
-
-		if (node->data.iata >= from && node->data.iata <= to)
-		{
-			cout << node->data.iata << " "
-				<< node->data.name << ", "
-				<< node->data.city << ", "
-				<< node->data.country << '\n';
-		}
-
-		if (node->data.iata < to)
-		{
-			rangeSearch(node->right, from, to, visited);
-		}
-	}
-
-	Node* buildBalanced(vector<Airport>& airports,
-		int start, int end)
-	{
-		if (start > end)
-		{
-			return nullptr;
-		}
-
-		int mid = start + (end - start) / 2;
-
-		Node* node = new Node(airports[mid]);
-
-		node->left = buildBalanced(airports, start, mid - 1);
-		node->right = buildBalanced(airports, mid + 1, end);
-
-		return node;
-	}
-
-	bool searchQuiet(string code)
-	{
-		Node* current = root;
-
-		while (current != nullptr)
-		{
-			if (code == current->data.iata)
-			{
-				return true;
-			}
-			else if (code < current->data.iata)
-			{
-				current = current->left;
-			}
-			else
-			{
-				current = current->right;
-			}
-		}
-
-		return false;
-	}
+            if (current->right != nullptr) {
+                nodeStack.push_back(current->right);
+                depthStack.push_back(depth + 1);
+            }
+            if (current->left != nullptr) {
+                nodeStack.push_back(current->left);
+                depthStack.push_back(depth + 1);
+            }
+        }
+    }
 
 public:
-
-	bool insert(Airport a)
-	{
-		if (root == nullptr)
-		{
-			root = new Node(a);
-			return true;
-		}
-
-		Node* current = root;
-
-		while (true)
-		{
-			if (a.iata < current->data.iata)
-			{
-				if (current->left == nullptr)
-				{
-					current->left = new Node(a);
-					return true;
-				}
-
-				current = current->left;
-			}
-
-			else if (a.iata > current->data.iata)
-			{
-				if (current->right == nullptr)
-				{
-					current->right = new Node(a);
-					return true;
-				}
-
-				current = current->right;
-			}
-
-			else
-			{
-				return false;
-			}
-		}
-	}
-
-	int getHeight()
-	{
-		return height(root);
-	}
-
-	double getAverageDepth()
-	{
-		int totalDepth = 0;
-		int count = 0;
-
-		calculateDepth(root, 0, totalDepth, count);
-
-		if (count == 0)
-		{
-			return 0.0;
-		}
-
-		return (double)totalDepth / count;
-	}
-
-
-	bool search(string code)
-	{
-		Node* current = root;
-		int comparisons = 0;
-
-		cout << "Path: ";
-
-		while (current != nullptr)
-		{
-			comparisons++;
-
-			cout << current->data.iata;
-
-			if (code == current->data.iata)
-			{
-				cout << "\nComparisons: " << comparisons << '\n';
-
-				cout << current->data.iata << " "
-					<< current->data.name << ", "
-					<< current->data.city << ", "
-					<< current->data.country << '\n';
-
-				return true;
-			}
-
-			else if (code < current->data.iata)
-			{
-				current = current->left;
-			}
-
-			else
-			{
-				current = current->right;
-			}
-
-			if (current != nullptr)
-			{
-				cout << " -> ";
-			}
-		}
-
-		cout << " -> NULL\n";
-		cout << "Comparisons: " << comparisons << '\n';
-		cout << "Airport not found.\n";
-
-		return false;
-	}
-
-	string findMin()
-	{
-		if (root == nullptr)
-		{
-			return "";
-		}
-
-		Node* current = root;
-
-		while (current->left != nullptr)
-		{
-			current = current->left;
-		}
-
-		return current->data.iata;
-	}
-
-	string findMax()
-	{
-		if (root == nullptr)
-		{
-			return "";
-		}
-
-		Node* current = root;
-
-		while (current->right != nullptr)
-		{
-			current = current->right;
-		}
-
-		return current->data.iata;
-	}
-
-	void showLeaf()
-	{
-		findLeaf(root);
-	}
-
-	string getDeepestCode()
-	{
-		int maxDepth = -1;
-		string code = "";
-
-		findDeepest(root, 0, maxDepth, code);
-
-		return code;
-	}
-
-
-	bool remove(string code)
-	{
-		Node* current = root;
-		Node* parent = nullptr;
-
-		while (current != nullptr && current->data.iata != code)
-		{
-			parent = current;
-
-			if (code < current->data.iata)
-			{
-				current = current->left;
-			}
-			else
-			{
-				current = current->right;
-			}
-		}
-
-		if (current == nullptr)
-		{
-			cout << "Airport not found.\n";
-			return false;
-		}
-
-		// Case D1: No children
-		if (current->left == nullptr && current->right == nullptr)
-		{
-			if (current == root)
-			{
-				root = nullptr;
-			}
-			else if (parent->left == current)
-			{
-				parent->left = nullptr;
-			}
-			else
-			{
-				parent->right = nullptr;
-			}
-
-			delete current;
-			cout << "Deleted " << code << " (D1: leaf)\n";
-		}
-
-		// Case D2: One child
-		else if (current->left == nullptr || current->right == nullptr)
-		{
-			Node* child;
-
-			if (current->left != nullptr)
-			{
-				child = current->left;
-			}
-			else
-			{
-				child = current->right;
-			}
-
-			if (current == root)
-			{
-				root = child;
-			}
-			else if (parent->left == current)
-			{
-				parent->left = child;
-			}
-			else
-			{
-				parent->right = child;
-			}
-
-			delete current;
-			cout << "Deleted " << code << " (D2: one child)\n";
-		}
-
-		// Case D3: Two children
-		else
-		{
-			Node* successorParent = current;
-			Node* successor = current->right;
-
-			while (successor->left != nullptr)
-			{
-				successorParent = successor;
-				successor = successor->left;
-			}
-
-			current->data = successor->data;
-
-			if (successorParent == current)
-			{
-				successorParent->right = successor->right;
-			}
-			else
-			{
-				successorParent->left = successor->right;
-			}
-
-			delete successor;
-
-			cout << "Deleted " << code << " (D3: two children)\n";
-		}
-
-		return true;
-	}
-
-	void printLevelOrder()
-	{
-		if (root == nullptr)
-		{
-			cout << "Tree is empty.\n";
-			return;
-		}
-
-		vector<Node*> queue;
-		queue.push_back(root);
-
-		int level = 0;
-		int index = 0;
-
-		while (index < queue.size() && level < 3)
-		{
-			int levelSize = queue.size() - index;
-
-			for (int i = 0; i < levelSize; i++)
-			{
-				Node* current = queue[index];
-
-				cout << current->data.iata << " ";
-
-				if (current->left != nullptr)
-				{
-					queue.push_back(current->left);
-				}
-
-				if (current->right != nullptr)
-				{
-					queue.push_back(current->right);
-				}
-
-				index++;
-			}
-
-			cout << '\n';
-			level++;
-		}
-	}
-
-	string findLeafCode(Node* node)
-	{
-		if (node == nullptr)
-		{
-			return "";
-		}
-
-		if (node->left == nullptr && node->right == nullptr)
-		{
-			return node->data.iata;
-		}
-
-		string left = findLeafCode(node->left);
-
-		if (left != "")
-		{
-			return left;
-		}
-
-		return findLeafCode(node->right);
-	}
-
-	string findOneChild(Node* node)
-	{
-		if (node == nullptr)
-		{
-			return "";
-		}
-
-		if ((node->left == nullptr && node->right != nullptr) ||
-			(node->left != nullptr && node->right == nullptr))
-		{
-			return node->data.iata;
-		}
-
-		string left = findOneChild(node->left);
-
-		if (left != "")
-		{
-			return left;
-		}
-
-		return findOneChild(node->right);
-	}
-
-
-	string getRootCode()
-	{
-		if (root == nullptr)
-		{
-			return "";
-		}
-
-		return root->data.iata;
-	}
-
-	Node* getRoot()
-	{
-		return root;
-	}
-
-	string findOnlyLeftChild(Node* node)
-	{
-		if (node == nullptr)
-		{
-			return "";
-		}
-
-		if (node->left != nullptr && node->right == nullptr)
-		{
-			return node->data.iata;
-		}
-
-		string left = findOnlyLeftChild(node->left);
-
-		if (left != "")
-		{
-			return left;
-		}
-
-		return findOnlyLeftChild(node->right);
-	}
-
-	string findOnlyRightChild(Node* node)
-	{
-		if (node == nullptr)
-		{
-			return "";
-		}
-
-		if (node->left == nullptr && node->right != nullptr)
-		{
-			return node->data.iata;
-		}
-
-		string left = findOnlyRightChild(node->left);
-
-		if (left != "")
-		{
-			return left;
-		}
-
-		return findOnlyRightChild(node->right);
-	}
-
-	string findTwoChildren(Node* node)
-	{
-		if (node == nullptr)
-		{
-			return "";
-		}
-
-		if (node != root && node->left != nullptr &&
-			node->right != nullptr)
-		{
-			return node->data.iata;
-		}
-
-		string left = findTwoChildren(node->left);
-
-		if (left != "")
-		{
-			return left;
-		}
-
-		return findTwoChildren(node->right);
-	}
-
-	void printInorder()
-	{
-		vector<string> codes;
-
-		inorder(root, codes);
-
-		int total = (int)codes.size();
-
-		if (total <= 20)
-		{
-			for (int i = 0; i < total; i++)
-			{
-				cout << codes[i] << '\n';
-			}
-		}
-		else
-		{
-			cout << "First 10 codes:\n";
-
-			for (int i = 0; i < 10; i++)
-			{
-				cout << codes[i] << '\n';
-			}
-
-			cout << "...\n";
-
-			cout << "Last 10 codes:\n";
-
-			for (int i = total - 10; i < total; i++)
-			{
-				cout << codes[i] << '\n';
-			}
-		}
-	}
-
-	bool checkSorted()
-	{
-		vector<string> codes;
-
-		inorder(root, codes);
-
-		for (int i = 1; i < (int)codes.size(); i++)
-		{
-			if (codes[i] < codes[i - 1])
-			{
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	bool saveTree(string fileName)
-	{
-		ofstream file(fileName);
-
-		if (!file)
-		{
-			return false;
-		}
-
-		preorder(root, file);
-
-		file.close();
-
-		return true;
-	}
-
-	bool loadTree(string fileName)
-	{
-		ifstream file(fileName);
-
-		if (!file)
-		{
-			return false;
-		}
-
-		string line;
-
-		while (getline(file, line))
-		{
-			vector<string> fields = splitLine(line);
-
-			if (fields.size() < 7)
-			{
-				continue;
-			}
-
-			Airport a;
-
-			a.name = fields[0];
-			a.city = fields[1];
-			a.country = fields[2];
-			a.iata = fields[3];
-			a.icao = fields[4];
-			a.latitude = stod(fields[5]);
-			a.longitude = stod(fields[6]);
-
-			insert(a);
-		}
-
-		file.close();
-
-		return true;
-	}
-
-	bool sameShape(AirportBST& other)
-	{
-		return compareTrees(root, other.root);
-	}
-
-	void printFullLevelOrder()
-	{
-		if (root == nullptr)
-		{
-			cout << "Tree is empty.\n";
-			return;
-		}
-
-		vector<Node*> queue;
-		queue.push_back(root);
-
-		int index = 0;
-		vector<string> codes;
-
-		while (index < (int)queue.size())
-		{
-			Node* current = queue[index];
-
-			codes.push_back(current->data.iata);
-
-			if (current->left != nullptr)
-			{
-				queue.push_back(current->left);
-			}
-
-			if (current->right != nullptr)
-			{
-				queue.push_back(current->right);
-			}
-
-			index++;
-		}
-
-		int total = (int)codes.size();
-
-		if (total <= 20)
-		{
-			for (int i = 0; i < total; i++)
-			{
-				cout << codes[i] << " ";
-			}
-		}
-		else
-		{
-			for (int i = 0; i < 10; i++)
-			{
-				cout << codes[i] << " ";
-			}
-
-			cout << "... ";
-
-			for (int i = total - 10; i < total; i++)
-			{
-				cout << codes[i] << " ";
-			}
-		}
-
-		cout << '\n';
-	}
-
-	bool validateTree()
-	{
-		return validate(root, "", "ZZZ");
-	}
-
-	void range(string from, string to)
-	{
-		if (from > to)
-		{
-			cout << "Invalid range.\n";
-			return;
-		}
-
-		int visited = 0;
-
-		cout << "\nAirports between " << from
-			<< " and " << to << ":\n";
-
-		rangeSearch(root, from, to, visited);
-
-		cout << "\nNodes visited: " << visited << '\n';
-	}
-
-	void makeBalanced(vector<Airport>& airports)
-	{
-		root = buildBalanced(airports, 0,
-			(int)airports.size() - 1);
-	}
-
-	bool searchForTiming(string code)
-	{
-		return searchQuiet(code);
-	}
+    AirportBST() {
+        root = nullptr;
+    }
+
+    ~AirportBST() {
+        clearTree();
+    }
+
+    void clearTree() {
+        if (root == nullptr) {
+            return;
+        }
+
+        vector<Node*> stack;
+        stack.push_back(root);
+
+        while ((int)stack.size() > 0) {
+            Node* current = stack[stack.size() - 1];
+            stack.pop_back();
+
+            if (current->left != nullptr) {
+                stack.push_back(current->left);
+            }
+            if (current->right != nullptr) {
+                stack.push_back(current->right);
+            }
+            delete current;
+        }
+
+        root = nullptr;
+    }
+
+    bool insert(Airport a) {
+        if (root == nullptr) {
+            root = new Node(a);
+            return true;
+        }
+
+        Node* current = root;
+
+        while (true) {
+            if (a.iata < current->data.iata) {
+                if (current->left == nullptr) {
+                    current->left = new Node(a);
+                    return true;
+                }
+                current = current->left;
+            } else if (a.iata > current->data.iata) {
+                if (current->right == nullptr) {
+                    current->right = new Node(a);
+                    return true;
+                }
+                current = current->right;
+            } else {
+                return false;
+            }
+        }
+    }
+
+    void insertAll(vector<Airport> &airports, int &inserted, int &duplicates) {
+        inserted = 0;
+        duplicates = 0;
+
+        for (int i = 0; i < (int)airports.size(); i++) {
+            if (insert(airports[i])) {
+                inserted = inserted + 1;
+            } else {
+                duplicates = duplicates + 1;
+                cout << "Duplicate: " << airports[i].iata << " (rule I4, not inserted)" << endl;
+            }
+        }
+    }
+
+    int getHeight() {
+        if (root == nullptr) {
+            return -1;
+        }
+
+        vector<Node*> queue;
+        queue.push_back(root);
+        int index = 0;
+        int height = -1;
+
+        while (index < (int)queue.size()) {
+            int levelSize = (int)queue.size() - index;
+
+            for (int i = 0; i < levelSize; i++) {
+                Node* current = queue[index];
+                if (current->left != nullptr) {
+                    queue.push_back(current->left);
+                }
+                if (current->right != nullptr) {
+                    queue.push_back(current->right);
+                }
+                index = index + 1;
+            }
+
+            height = height + 1;
+        }
+
+        return height;
+    }
+
+    double getAverageDepth() {
+        int totalDepth = 0;
+        int count = 0;
+        calculateDepth(totalDepth, count);
+
+        if (count == 0) {
+            return 0.0;
+        }
+        return (double)totalDepth / count;
+    }
+
+    int getCount() {
+        int totalDepth = 0;
+        int count = 0;
+        calculateDepth(totalDepth, count);
+        return count;
+    }
+
+    bool search(string code) {
+        Node* current = root;
+        int comparisons = 0;
+
+        cout << "Path: ";
+
+        while (current != nullptr) {
+            comparisons = comparisons + 1;
+            cout << current->data.iata;
+
+            if (code == current->data.iata) {
+                cout << endl;
+                cout << "Comparisons: " << comparisons << endl;
+                cout << current->data.iata << " "
+                     << current->data.name << ", "
+                     << current->data.city << ", "
+                     << current->data.country << endl;
+                return true;
+            } else if (code < current->data.iata) {
+                current = current->left;
+            } else {
+                current = current->right;
+            }
+
+            cout << " -> ";
+        }
+
+        cout << "NULL" << endl;
+        cout << "Comparisons: " << comparisons << endl;
+        cout << code << " not found" << endl;
+
+        return false;
+    }
+
+    bool searchQuiet(string code) {
+        Node* current = root;
+
+        while (current != nullptr) {
+            if (code == current->data.iata) {
+                return true;
+            } else if (code < current->data.iata) {
+                current = current->left;
+            } else {
+                current = current->right;
+            }
+        }
+
+        return false;
+    }
+
+    string findMin() {
+        if (root == nullptr) {
+            return "";
+        }
+        Node* current = root;
+        while (current->left != nullptr) {
+            current = current->left;
+        }
+        return current->data.iata;
+    }
+
+    string findMax() {
+        if (root == nullptr) {
+            return "";
+        }
+        Node* current = root;
+        while (current->right != nullptr) {
+            current = current->right;
+        }
+        return current->data.iata;
+    }
+
+    string getRootCode() {
+        if (root == nullptr) {
+            return "";
+        }
+        return root->data.iata;
+    }
+
+    string getDeepestCode() {
+        int maxDepth = -1;
+        string code = "";
+        findDeepest(root, 0, maxDepth, code);
+        return code;
+    }
+
+    string findLeafCode() {
+        return findLeafCode(root);
+    }
+
+    string findOnlyLeftChild() {
+        return findOnlyLeftChild(root);
+    }
+
+    string findOnlyRightChild() {
+        return findOnlyRightChild(root);
+    }
+
+    string findTwoChildren() {
+        return findTwoChildren(root);
+    }
+
+    bool remove(string code) {
+        Node* current = root;
+        Node* parent = nullptr;
+
+        while (current != nullptr && current->data.iata != code) {
+            parent = current;
+            if (code < current->data.iata) {
+                current = current->left;
+            } else {
+                current = current->right;
+            }
+        }
+
+        if (current == nullptr) {
+            cout << code << " not found, nothing deleted" << endl;
+            return false;
+        }
+
+        if (current->left == nullptr && current->right == nullptr) {
+            // Case D1: No children
+            if (current == root) {
+                root = nullptr;
+            } else if (parent->left == current) {
+                parent->left = nullptr;
+            } else {
+                parent->right = nullptr;
+            }
+
+            delete current;
+            cout << "Deleted " << code << " (case D1: leaf)" << endl;
+        } else if (current->left == nullptr || current->right == nullptr) {
+            // Case D2: One child
+            Node* child;
+            string side;
+            if (current->left != nullptr) {
+                child = current->left;
+                side = "only a left child";
+            } else {
+                child = current->right;
+                side = "only a right child";
+            }
+
+            if (current == root) {
+                root = child;
+            } else if (parent->left == current) {
+                parent->left = child;
+            } else {
+                parent->right = child;
+            }
+
+            cout << "Deleted " << code << " (case D2: " << side << ", "
+                 << child->data.iata << ")" << endl;
+            delete current;
+        } else {
+            // Case D3: Two children
+            Node* successorParent = current;
+            Node* successor = current->right;
+
+            while (successor->left != nullptr) {
+                successorParent = successor;
+                successor = successor->left;
+            }
+
+            string successorCode = successor->data.iata;
+            current->data = successor->data;
+
+            if (successorParent == current) {
+                successorParent->right = successor->right;
+            } else {
+                successorParent->left = successor->right;
+            }
+
+            delete successor;
+            cout << "Deleted " << code << " (case D3: two children, replaced by successor "
+                 << successorCode << ")" << endl;
+        }
+
+        return true;
+    }
+
+    void printLevelOrder() {
+        if (root == nullptr) {
+            cout << "Tree is empty" << endl;
+            return;
+        }
+
+        vector<Node*> queue;
+        queue.push_back(root);
+        int index = 0;
+        int level = 0;
+
+        while (index < (int)queue.size() && level < 3) {
+            int levelSize = (int)queue.size() - index;
+
+            for (int i = 0; i < levelSize; i++) {
+                Node* current = queue[index];
+                cout << current->data.iata << " ";
+
+                if (current->left != nullptr) {
+                    queue.push_back(current->left);
+                }
+                if (current->right != nullptr) {
+                    queue.push_back(current->right);
+                }
+                index = index + 1;
+            }
+
+            cout << endl;
+            level = level + 1;
+        }
+    }
+
+    void printFullLevelOrder() {
+        if (root == nullptr) {
+            cout << "Tree is empty" << endl;
+            return;
+        }
+
+        vector<Node*> queue;
+        queue.push_back(root);
+        int index = 0;
+
+        while (index < (int)queue.size()) {
+            Node* current = queue[index];
+            if (current->left != nullptr) {
+                queue.push_back(current->left);
+            }
+            if (current->right != nullptr) {
+                queue.push_back(current->right);
+            }
+            index = index + 1;
+        }
+
+        int total = (int)queue.size();
+
+        if (total <= 20) {
+            for (int i = 0; i < total; i++) {
+                cout << queue[i]->data.iata << " ";
+            }
+        } else {
+            for (int i = 0; i < 10; i++) {
+                cout << queue[i]->data.iata << " ";
+            }
+            cout << "... ";
+            for (int i = total - 10; i < total; i++) {
+                cout << queue[i]->data.iata << " ";
+            }
+        }
+        cout << "(" << total << " nodes)" << endl;
+    }
+
+    void printList() {
+        vector<Airport> sorted;
+        inorder(root, sorted);
+
+        for (int i = 0; i < (int)sorted.size(); i++) {
+            cout << sorted[i].iata << " "
+                 << sorted[i].name << ", "
+                 << sorted[i].city << ", "
+                 << sorted[i].country << endl;
+        }
+        cout << "Listed " << sorted.size() << " airports" << endl;
+    }
+
+    bool checkSorted() {
+        vector<Airport> sorted;
+        inorder(root, sorted);
+
+        for (int i = 1; i < (int)sorted.size(); i++) {
+            if (sorted[i].iata < sorted[i - 1].iata) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void getSortedAirports(vector<Airport> &sorted) {
+        sorted.clear();
+        inorder(root, sorted);
+    }
+
+    bool saveTree(string fileName) {
+        ofstream file(fileName);
+        if (!file) {
+            return false;
+        }
+
+        file.precision(15);
+        preorder(root, file);
+        file.close();
+
+        return true;
+    }
+
+    bool loadTree(string fileName, int &loaded, int &skipped, int &duplicates) {
+        vector<string> lines;
+        if (!readFile(fileName, lines)) {
+            return false;
+        }
+
+        vector<Airport> airports;
+        loadAirports(lines, airports, skipped);
+
+        clearTree();
+        insertAll(airports, loaded, duplicates);
+
+        return true;
+    }
+
+    bool sameShape(AirportBST &other) {
+        return compareTrees(root, other.root);
+    }
+
+    bool validateTree() {
+        return validate(root, "", "ZZZZ");
+    }
+
+    void range(string from, string to) {
+        if (from > to) {
+            cout << "Invalid range: " << from << " comes after " << to << endl;
+            return;
+        }
+
+        int visited = 0;
+        int found = 0;
+        rangeSearch(root, from, to, visited, found);
+
+        cout << found << " airports, " << visited << " nodes visited" << endl;
+    }
+
+    void buildFromSorted(vector<Airport> &sortedAirports) {
+        clearTree();
+        root = buildBalanced(sortedAirports, 0, (int)sortedAirports.size() - 1);
+    }
+
+    void rebalance() {
+        vector<Airport> sorted;
+        getSortedAirports(sorted);
+        buildFromSorted(sorted);
+    }
 };
 
 //=====================================================
 
-bool readFile(const string& fileName, vector<string> & lines)
-{
-	ifstream file(fileName);
-	if (!file)
-	{
-		return false;
-	}
-	string line;
-	while (getline(file, line))
-	{
-		lines.push_back(line);
-	}
-	return true;
+void printValidate(AirportBST &tree) {
+    if (tree.validateTree()) {
+        cout << "validate: OK" << endl;
+    } else {
+        cout << "validate: FAILED" << endl;
+    }
 }
 
 //=====================================================
 
-vector<string> splitLine(const string& line)
-{
-	vector<string> fields;
-	string field = "";
-	bool insideQuotes = false;
+int countCountries(vector<Airport> &airports, int &usCount) {
+    vector<string> countries;
+    usCount = 0;
 
-	for (int i = 0; i < line.length(); i++)
-	{
-		char c = line[i];
+    for (int i = 0; i < (int)airports.size(); i++) {
+        if (airports[i].country == "United States") {
+            usCount = usCount + 1;
+        }
 
-		if (c == '"')
-		{
-			insideQuotes = !insideQuotes;
-		}
-		else if (c == ',' && insideQuotes == false)
-		{
-			fields.push_back(field);
-			field = "";
-		}
-		else
-		{
-			field += c;
-		}
-	}
+        bool seen = false;
+        for (int j = 0; j < (int)countries.size(); j++) {
+            if (countries[j] == airports[i].country) {
+                seen = true;
+            }
+        }
+        if (seen == false) {
+            countries.push_back(airports[i].country);
+        }
+    }
 
-	fields.push_back(field);
-
-	return fields;
+    return (int)countries.size();
 }
 
 //=====================================================
 
-void loadAirports(const vector<string>& lines,
-	vector<Airport>& airports,
-	int& skipped)
-{
-	skipped = 0;
+int longestIncreasingRun(vector<Airport> &airports, int &bestStart) {
+    int bestLength = 1;
+    int length = 1;
+    int start = 0;
+    bestStart = 0;
 
-	for (int i = 0; i < lines.size(); i++)
-	{
-		vector<string> fields = splitLine(lines[i]);
+    for (int i = 1; i < (int)airports.size(); i++) {
+        if (airports[i].iata > airports[i - 1].iata) {
+            length = length + 1;
+        } else {
+            length = 1;
+            start = i;
+        }
 
-		if (fields.size() < 8)
-		{
-			continue;
-		}
+        if (length > bestLength) {
+            bestLength = length;
+            bestStart = start;
+        }
+    }
 
-		if (fields[4] == "\\N")
-		{
-			skipped++;
-			continue;
-		}
-
-		Airport a;
-
-		a.name = fields[1];
-		a.city = fields[2];
-		a.country = fields[3];
-		a.iata = fields[4];
-		a.icao = fields[5];
-		a.latitude = stod(fields[6]);
-		a.longitude = stod(fields[7]);
-
-		airports.push_back(a);
-	}
+    return bestLength;
 }
 
 //=====================================================
 
-double timeSearches(AirportBST& tree,
-	vector<Airport>& airports)
-{
-	const int SEARCH_COUNT = 10000;
+void shuffleAirports(vector<Airport> &airports) {
+    int n = (int)airports.size();
 
-	srand(42);
-
-	vector<int> randomIndexes;
-
-	for (int i = 0; i < SEARCH_COUNT; i++)
-	{
-		int index = rand() % airports.size();
-		randomIndexes.push_back(index);
-	}
-
-	auto start = chrono::high_resolution_clock::now();
-
-	for (int i = 0; i < SEARCH_COUNT; i++)
-	{
-		tree.searchForTiming(
-			airports[randomIndexes[i]].iata);
-	}
-
-	auto end = chrono::high_resolution_clock::now();
-
-	chrono::duration<double, milli> elapsed = end - start;
-
-	return elapsed.count();
+    for (int i = 0; i < n - 1; i++) {
+        int j = i + rand() % (n - i);
+        Airport temp = airports[i];
+        airports[i] = airports[j];
+        airports[j] = temp;
+    }
 }
 
 //=====================================================
 
+double timeSearches(AirportBST &tree, vector<Airport> &airports, int &found) {
+    int searchCount = 10000;
+
+    srand(42);
+    vector<int> randomIndexes;
+    for (int i = 0; i < searchCount; i++) {
+        randomIndexes.push_back(rand() % (int)airports.size());
+    }
+
+    found = 0;
+    chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < searchCount; i++) {
+        if (tree.searchQuiet(airports[randomIndexes[i]].iata)) {
+            found = found + 1;
+        }
+    }
+
+    chrono::high_resolution_clock::time_point end = chrono::high_resolution_clock::now();
+    chrono::duration<double, milli> elapsed = end - start;
+
+    return elapsed.count();
+}
+
+//=====================================================
+
+string toUpperCode(string code) {
+    string result = "";
+    for (int i = 0; i < (int)code.length(); i++) {
+        char c = code[i];
+        if (c >= 'a' && c <= 'z') {
+            c = c - 'a' + 'A';
+        }
+        result = result + c;
+    }
+    return result;
+}
+
+//=====================================================
+
+vector<string> splitWords(string line) {
+    vector<string> words;
+    string word = "";
+
+    for (int i = 0; i < (int)line.length(); i++) {
+        if (line[i] == ' ' || line[i] == '\t' || line[i] == '\r') {
+            if (word != "") {
+                words.push_back(word);
+                word = "";
+            }
+        } else {
+            word = word + line[i];
+        }
+    }
+    if (word != "") {
+        words.push_back(word);
+    }
+
+    return words;
+}
+
+//=====================================================
+
+string cleanPath(string path) {
+    int start = 0;
+    int end = (int)path.length() - 1;
+
+    while (start <= end && (path[start] == ' ' || path[start] == '"')) {
+        start = start + 1;
+    }
+    while (end >= start && (path[end] == ' ' || path[end] == '"' || path[end] == '\r')) {
+        end = end - 1;
+    }
+
+    return path.substr(start, end - start + 1);
+}
 
-int main()
-{
-	string fileName = "data/airports.dat";
-	vector<string> lines;
+//=====================================================
+
+void testDeletion(AirportBST &tree, string code, string label) {
+    cout << endl << label << ":" << endl;
+    cout << "Deleting: " << code << endl;
+    cout << "Before:" << endl;
+    tree.printLevelOrder();
+
+    tree.remove(code);
+    printValidate(tree);
+
+    cout << "After:" << endl;
+    tree.printLevelOrder();
+}
+
+//=====================================================
+
+void runTask1(vector<Airport> &airports, int totalLines, int skipped) {
+    cout << endl << "Task 1" << endl;
+
+    AirportBST tree;
+    int inserted = 0;
+    int duplicates = 0;
+    tree.insertAll(airports, inserted, duplicates);
 
-	if (!readFile(fileName, lines))
-	{
-		cout << "Error: cannot open " << fileName << '\n';
-		return 1;
-	}
+    int usCount = 0;
+    int countries = countCountries(airports, usCount);
 
-	vector<Airport> airports;
-	int skipped = 0;
+    cout << "Total lines: " << totalLines << endl;
+    cout << "Loaded " << airports.size() << " airports (" << skipped
+         << " lines skipped: no IATA code). Duplicates: " << duplicates << endl;
+    cout << "Inserted: " << inserted << endl;
+    cout << "Countries: " << countries << ", United States airports: " << usCount << endl;
+    cout << "Height: " << tree.getHeight() << endl;
+    cout << "Average depth: " << tree.getAverageDepth() << endl;
+}
 
-	loadAirports(lines, airports, skipped);
+//=====================================================
 
-	AirportBST tree;
+void runTask2(vector<Airport> &airports) {
+    cout << endl << "Task 2" << endl;
 
-	int inserted = 0;
-	int duplicates = 0;
+    AirportBST tree;
+    int inserted = 0;
+    int duplicates = 0;
+    tree.insertAll(airports, inserted, duplicates);
 
-	for (int i = 0; i < airports.size(); i++)
-	{
-		if (tree.insert(airports[i]))
-		{
-			inserted++;
-		}
-		else
-		{
-			duplicates++;
-			cout << "Duplicate: " << airports[i].iata << '\n';
-		}
-	}
+    cout << endl << "Minimum code: " << tree.findMin() << endl;
+    cout << "Maximum code: " << tree.findMax() << endl;
 
-	int choice;
+    cout << endl << "Root:" << endl;
+    tree.search(tree.getRootCode());
 
-	cout << "\n===== AIRPORT BST PROJECT =====\n";
-	cout << "1. Task 1 - Load Data and Build BST\n";
-	cout << "2. Task 2 - Search\n";
-	cout << "3. Task 3 - Delete\n";
-	cout << "4. Task 4 - Traversals and Validation\n";
-	cout << "5. Task 5 - Range Queries\n";
-	cout << "6. Task 6 - Shape Experiment\n";
-	cout << "0. Exit\n";
-	cout << "Enter task number: ";
+    cout << endl << "Leaf:" << endl;
+    tree.search(tree.findLeafCode());
 
-	cin >> choice;
-
-	switch (choice)
-	{
-	case 1:
-	{
-		cout << "\n===== TASK 1 =====\n";
-
-		cout << "Total lines: " << lines.size() << '\n';
-		cout << "Airports loaded: " << airports.size() << '\n';
-		cout << "Airports skipped: " << skipped << '\n';
-		cout << "Inserted: " << inserted << '\n';
-		cout << "Duplicates: " << duplicates << '\n';
-		cout << "Height: " << tree.getHeight() << '\n';
-
-		cout << "Average depth: "
-			<< tree.getAverageDepth() << '\n';
-
-		break;
-	}
-
-	case 2:
-	{
-		cout << "\n===== TASK 2 =====\n";
-
-		cout << "\nMinimum code: " << tree.findMin() << '\n';
-		cout << "Maximum code: " << tree.findMax() << '\n';
-
-		cout << "\n--- Root ---\n";
-		tree.search("GKA");
-
-		cout << "\n--- Nonexistent code ---\n";
-		tree.search("XYZ");
-
-		cout << "\n--- Smaller than minimum ---\n";
-		tree.search("000");
-
-		cout << "\n--- Larger than maximum ---\n";
-		tree.search("ZZZ");
-
-		cout << "\n--- Leaf ---\n";
-		tree.search("AAC");
-
-		cout << "\n--- Deep node ---\n";
-
-		string deepCode = tree.getDeepestCode();
-
-		cout << "Deepest code: " << deepCode << '\n';
-		tree.search(deepCode);
-
-		break;
-	}
-
-	case 3:
-	{
-		cout << "\n===== TASK 3 =====\n";
-
-		string code;
-
-		// D1: Leaf
-		code = tree.findLeafCode(tree.getRoot());
-
-		cout << "\n--- D1: Leaf ---\n";
-		cout << "Deleting: " << code << '\n';
-
-		cout << "Before:\n";
-		tree.printLevelOrder();
-
-		tree.remove(code);
-
-		cout << "After:\n";
-		tree.printLevelOrder();
-
-		// D2: Only left child
-		code = tree.findOnlyLeftChild(tree.getRoot());
-
-		cout << "\n--- D2: Only Left Child ---\n";
-		cout << "Deleting: " << code << '\n';
-
-		cout << "Before:\n";
-		tree.printLevelOrder();
-
-		tree.remove(code);
-
-		cout << "After:\n";
-		tree.printLevelOrder();
-
-		// D2: Only right child
-		code = tree.findOnlyRightChild(tree.getRoot());
-
-		cout << "\n--- D2: Only Right Child ---\n";
-		cout << "Deleting: " << code << '\n';
-
-		cout << "Before:\n";
-		tree.printLevelOrder();
-
-		tree.remove(code);
-
-		cout << "After:\n";
-		tree.printLevelOrder();
-
-		// D3: Two children
-		code = tree.findTwoChildren(tree.getRoot());
-
-		cout << "\n--- D3: Two Children ---\n";
-		cout << "Deleting: " << code << '\n';
-
-		cout << "Before:\n";
-		tree.printLevelOrder();
-
-		tree.remove(code);
-
-		cout << "After:\n";
-		tree.printLevelOrder();
-
-		// Delete root
-		code = tree.getRootCode();
-
-		cout << "\n--- Root Deletion ---\n";
-		cout << "Deleting: " << code << '\n';
-
-		cout << "Before:\n";
-		tree.printLevelOrder();
-
-		tree.remove(code);
-
-		cout << "After:\n";
-		tree.printLevelOrder();
-
-		// Add a made-up airport
-		cout << "\n--- Add Made-Up Airport ---\n";
-
-		Airport fakeAirport;
-
-		fakeAirport.name = "My Test Airport";
-		fakeAirport.city = "Boston";
-		fakeAirport.country = "United States";
-		fakeAirport.iata = "QQQ";
-		fakeAirport.icao = "KQQQ";
-		fakeAirport.latitude = 42.0;
-		fakeAirport.longitude = -71.0;
-
-		tree.insert(fakeAirport);
-
-		cout << "\nSearching for QQQ:\n";
-		tree.search("QQQ");
-
-		// Remove the made-up airport
-		cout << "\n--- Remove QQQ ---\n";
-
-		tree.remove("QQQ");
-
-		cout << "\nSearching for QQQ again:\n";
-		tree.search("QQQ");
-
-		break;
-	}
-
-	case 4:
-	{
-		cout << "\n===== TASK 4 =====\n";
-
-		// Task 4(a): Inorder Traversal
-		cout << "\n--- Inorder Traversal ---\n";
-
-		tree.printInorder();
-
-		cout << "\n--- Sorted Check ---\n";
-
-		if (tree.checkSorted())
-		{
-			cout << "Airport codes are sorted.\n";
-		}
-		else
-		{
-			cout << "Airport codes are NOT sorted.\n";
-		}
-
-		// Task 4(b): Save and Reload Tree
-		cout << "\n--- Save Tree ---\n";
-
-		if (tree.saveTree("preorder.txt"))
-		{
-			cout << "Tree saved successfully.\n";
-		}
-		else
-		{
-			cout << "Error saving tree.\n";
-		}
-
-		cout << "\n--- Reload Tree ---\n";
-
-		AirportBST reloadedTree;
-
-		if (reloadedTree.loadTree("preorder.txt"))
-		{
-			cout << "Tree reloaded successfully.\n";
-
-			cout << "\nOriginal Height: "
-				<< tree.getHeight() << '\n';
-
-			cout << "Reloaded Height: "
-				<< reloadedTree.getHeight() << '\n';
-
-			cout << "\nOriginal Level Order:\n";
-
-			tree.printFullLevelOrder();
-
-			cout << "\nReloaded Level Order:\n";
-
-			reloadedTree.printFullLevelOrder();
-
-			cout << "\n--- Shape Comparison ---\n";
-
-			if (tree.sameShape(reloadedTree))
-			{
-				cout << "Trees have the same shape.\n";
-			}
-			else
-			{
-				cout << "Trees have different shapes.\n";
-			}
-		}
-		else
-		{
-			cout << "Error loading tree.\n";
-		}
-
-		// Task 4(c): BST Validation
-		cout << "\n--- BST Validation ---\n";
-
-		if (tree.validateTree())
-		{
-			cout << "Original BST is valid.\n";
-		}
-		else
-		{
-			cout << "Original BST is NOT valid.\n";
-		}
-
-		if (reloadedTree.validateTree())
-		{
-			cout << "Reloaded BST is valid.\n";
-		}
-		else
-		{
-			cout << "Reloaded BST is NOT valid.\n";
-		}
-
-		break;
-	}
-
-	case 5:
-	{
-		cout << "\n===== TASK 5 =====\n";
-
-		cout << "\n--- Range Query: BOS to BWI ---\n";
-
-		tree.range("BOS", "BWI");
-
-		break;
-	}
-
-	case 6:
-	{
-		cout << "\n===== TASK 6 =====\n";
-
-		// Create the four BSTs
-		AirportBST fileOrderTree;
-		AirportBST sortedTree;
-		AirportBST balancedTree;
-		AirportBST randomTree;
-
-		// Build the file order tree
-		for (int i = 0; i < airports.size(); i++)
-		{
-			fileOrderTree.insert(airports[i]);
-		}
-
-		// Build the sorted order tree
-		vector<Airport> sortedAirports = airports;
-
-		sort(sortedAirports.begin(), sortedAirports.end(),
-			[](const Airport& a, const Airport& b)
-			{
-				return a.iata < b.iata;
-			});
-
-		for (int i = 0; i < sortedAirports.size(); i++)
-		{
-			sortedTree.insert(sortedAirports[i]);
-		}
-
-		// Build the balanced tree
-		balancedTree.makeBalanced(sortedAirports);
-
-		// Build the random shuffle tree
-		vector<Airport> shuffledAirports = airports;
-
-		random_device rd;
-		mt19937 generator(rd());
-
-		shuffle(shuffledAirports.begin(),
-			shuffledAirports.end(),
-			generator);
-
-		for (int i = 0; i < shuffledAirports.size(); i++)
-		{
-			randomTree.insert(shuffledAirports[i]);
-		}
-
-		// Print tree heights
-		cout << "\n--- Tree Heights ---\n";
-
-		cout << "File Order Height: "
-			<< fileOrderTree.getHeight() << '\n';
-
-		cout << "Sorted Order Height: "
-			<< sortedTree.getHeight() << '\n';
-
-		cout << "Balanced Height: "
-			<< balancedTree.getHeight() << '\n';
-
-		cout << "Random Shuffle Height: "
-			<< randomTree.getHeight() << '\n';
-
-		// Print average depths
-		cout << "\n--- Average Depths ---\n";
-
-		cout << "File Order: "
-			<< fileOrderTree.getAverageDepth() << '\n';
-
-		cout << "Sorted Order: "
-			<< sortedTree.getAverageDepth() << '\n';
-
-		cout << "Balanced: "
-			<< balancedTree.getAverageDepth() << '\n';
-
-		cout << "Random Shuffle: "
-			<< randomTree.getAverageDepth() << '\n';
-
-		// Time 10,000 random searches
-		cout << "\n--- Search Timing (10,000 Searches) ---\n";
-
-		double fileTime =
-			timeSearches(fileOrderTree, airports);
-
-		double sortedTime =
-			timeSearches(sortedTree, airports);
-
-		double balancedTime =
-			timeSearches(balancedTree, airports);
-
-		double randomTime =
-			timeSearches(randomTree, airports);
-
-		cout << "File Order: "
-			<< fileTime << " ms\n";
-
-		cout << "Sorted Order: "
-			<< sortedTime << " ms\n";
-
-		cout << "Balanced: "
-			<< balancedTime << " ms\n";
-
-		cout << "Random Shuffle: "
-			<< randomTime << " ms\n";
-
-		break;
-	}
-
-	case 0:
-	{
-		cout << "Exiting program.\n";
-		break;
-	}
-
-	default:
-	{
-		cout << "Invalid choice.\n";
-		break;
-	}
-	}
-
-	return 0;
+    cout << endl << "Deep node:" << endl;
+    string deepCode = tree.getDeepestCode();
+    cout << "Deepest code: " << deepCode << endl;
+    tree.search(deepCode);
+
+    cout << endl << "Nonexistent code:" << endl;
+    tree.search("XYZ");
+
+    cout << endl << "Smaller than minimum:" << endl;
+    tree.search("000");
+
+    cout << endl << "Larger than maximum:" << endl;
+    tree.search("ZZZ");
+}
+
+//=====================================================
+
+void runTask3(vector<Airport> &airports) {
+    cout << endl << "Task 3" << endl;
+
+    AirportBST tree;
+    int inserted = 0;
+    int duplicates = 0;
+    tree.insertAll(airports, inserted, duplicates);
+
+    // D1: Leaf
+    testDeletion(tree, tree.findLeafCode(), "Leaf (D1)");
+
+    // D2: Only left child
+    testDeletion(tree, tree.findOnlyLeftChild(), "Only Left Child (D2)");
+
+    // D2: Only right child
+    testDeletion(tree, tree.findOnlyRightChild(), "Only Right Child (D2)");
+
+    // D3: Two children
+    testDeletion(tree, tree.findTwoChildren(), "Two Children (D3)");
+
+    // Delete root
+    testDeletion(tree, tree.getRootCode(), "Root");
+
+    // Add a made-up airport
+    cout << endl << "Add Made-Up Airport QQQ:" << endl;
+
+    Airport fakeAirport;
+    fakeAirport.id = "\\N";
+    fakeAirport.name = "My Test Airport";
+    fakeAirport.city = "Boston";
+    fakeAirport.country = "United States";
+    fakeAirport.iata = "QQQ";
+    fakeAirport.icao = "KQQQ";
+    fakeAirport.latitude = 42.0;
+    fakeAirport.longitude = -71.0;
+
+    if (tree.insert(fakeAirport)) {
+        cout << "Inserted QQQ" << endl;
+    } else {
+        cout << "QQQ already exists (rule I4)" << endl;
+    }
+    printValidate(tree);
+
+    cout << endl << "Searching for QQQ:" << endl;
+    tree.search("QQQ");
+
+    // Remove the made-up airport
+    cout << endl << "Remove QQQ:" << endl;
+    tree.remove("QQQ");
+    printValidate(tree);
+
+    cout << endl << "Searching for QQQ again:" << endl;
+    tree.search("QQQ");
+}
+
+//=====================================================
+
+void runTask4(vector<Airport> &airports) {
+    cout << endl << "Task 4" << endl;
+
+    AirportBST tree;
+    int inserted = 0;
+    int duplicates = 0;
+    tree.insertAll(airports, inserted, duplicates);
+
+    // Task 4(a): Inorder Traversal
+    cout << endl << "List (inorder):" << endl;
+    tree.printList();
+
+    if (tree.checkSorted()) {
+        cout << "Inorder codes are sorted" << endl;
+    } else {
+        cout << "Inorder codes are NOT sorted" << endl;
+    }
+
+    // Task 4(b): Save and Reload Tree
+    cout << endl << "Save:" << endl;
+    string fileName = "preorder.txt";
+
+    if (tree.saveTree(fileName)) {
+        cout << "Saved " << tree.getCount() << " airports in preorder to " << fileName << endl;
+    } else {
+        cout << "Error saving " << fileName << endl;
+        return;
+    }
+
+    cout << endl << "Load:" << endl;
+    AirportBST reloadedTree;
+    int loaded = 0;
+    int skipped = 0;
+    int reloadDuplicates = 0;
+
+    if (reloadedTree.loadTree(fileName, loaded, skipped, reloadDuplicates) == false) {
+        cout << "Error loading " << fileName << endl;
+        return;
+    }
+    cout << "Loaded " << loaded << " airports from " << fileName << endl;
+
+    cout << endl << "Original height: " << tree.getHeight() << endl;
+    cout << "Reloaded height: " << reloadedTree.getHeight() << endl;
+
+    cout << endl << "Original top three levels:" << endl;
+    tree.printLevelOrder();
+    cout << "Reloaded top three levels:" << endl;
+    reloadedTree.printLevelOrder();
+
+    cout << endl << "Original full level order:" << endl;
+    tree.printFullLevelOrder();
+    cout << "Reloaded full level order:" << endl;
+    reloadedTree.printFullLevelOrder();
+
+    if (tree.sameShape(reloadedTree)) {
+        cout << "Trees have the same shape" << endl;
+    } else {
+        cout << "Trees have different shapes" << endl;
+    }
+
+    // Task 4(c): BST Validation
+    cout << endl << "Validate:" << endl;
+    cout << "Original tree ";
+    printValidate(tree);
+    cout << "Reloaded tree ";
+    printValidate(reloadedTree);
+}
+
+//=====================================================
+
+void runTask5(vector<Airport> &airports) {
+    cout << endl << "Task 5" << endl;
+
+    AirportBST tree;
+    int inserted = 0;
+    int duplicates = 0;
+    tree.insertAll(airports, inserted, duplicates);
+
+    cout << endl << "Range BOS to BWI:" << endl;
+    tree.range("BOS", "BWI");
+}
+
+//=====================================================
+
+void runTask6(vector<Airport> &airports) {
+    cout << endl << "Task 6" << endl;
+
+    int inserted = 0;
+    int duplicates = 0;
+
+    // Build the file order tree
+    AirportBST fileOrderTree;
+    fileOrderTree.insertAll(airports, inserted, duplicates);
+
+    // Build the sorted order tree
+    vector<Airport> sortedAirports;
+    fileOrderTree.getSortedAirports(sortedAirports);
+    AirportBST sortedTree;
+    sortedTree.insertAll(sortedAirports, inserted, duplicates);
+
+    // Build the balanced tree
+    AirportBST balancedTree;
+    balancedTree.buildFromSorted(sortedAirports);
+
+    // Build the random shuffle tree
+    vector<Airport> shuffledAirports = airports;
+    srand(2026);
+    shuffleAirports(shuffledAirports);
+    AirportBST randomTree;
+    randomTree.insertAll(shuffledAirports, inserted, duplicates);
+
+    // Time 10,000 random searches
+    int fileFound = 0;
+    int sortedFound = 0;
+    int balancedFound = 0;
+    int randomFound = 0;
+    double fileTime = timeSearches(fileOrderTree, airports, fileFound);
+    double sortedTime = timeSearches(sortedTree, airports, sortedFound);
+    double balancedTime = timeSearches(balancedTree, airports, balancedFound);
+    double randomTime = timeSearches(randomTree, airports, randomFound);
+
+    // Print the results
+    cout << endl << "File order: height " << fileOrderTree.getHeight()
+         << ", average depth " << fileOrderTree.getAverageDepth()
+         << ", 10,000 searches " << fileTime << " ms (found " << fileFound << ")" << endl;
+    cout << "Sorted order: height " << sortedTree.getHeight()
+         << ", average depth " << sortedTree.getAverageDepth()
+         << ", 10,000 searches " << sortedTime << " ms (found " << sortedFound << ")" << endl;
+    cout << "Balanced: height " << balancedTree.getHeight()
+         << ", average depth " << balancedTree.getAverageDepth()
+         << ", 10,000 searches " << balancedTime << " ms (found " << balancedFound << ")" << endl;
+    cout << "Random shuffle: height " << randomTree.getHeight()
+         << ", average depth " << randomTree.getAverageDepth()
+         << ", 10,000 searches " << randomTime << " ms (found " << randomFound << ")" << endl;
+
+    // Longest run of increasing codes in file order
+    int runStart = 0;
+    int runLength = longestIncreasingRun(airports, runStart);
+    int runEnd = runStart + runLength - 1;
+
+    cout << endl << "Longest run of increasing codes in file order: " << runLength
+         << " airports (" << airports[runStart].iata << " to " << airports[runEnd].iata
+         << ", " << airports[runStart].country << ")" << endl;
+    cout << "Deepest node in the file order tree: " << fileOrderTree.getDeepestCode() << endl;
+}
+
+//=====================================================
+
+void printHelp() {
+    cout << "load FILE        rebuild the tree from airports.dat or a saved file" << endl;
+    cout << "find CODE        search path, comparisons and airport" << endl;
+    cout << "add CODE         add an airport (asks for name, city, country)" << endl;
+    cout << "remove CODE      delete an airport, then validate" << endl;
+    cout << "list             every airport in code order" << endl;
+    cout << "save FILE        write the airports in preorder" << endl;
+    cout << "validate         check the BST property" << endl;
+    cout << "range FROM TO    every airport from FROM to TO" << endl;
+    cout << "rebalance        rebuild as a balanced tree" << endl;
+    cout << "levels           top three levels" << endl;
+    cout << "stats            size, height, average depth, min and max" << endl;
+    cout << "quit             back to the menu" << endl;
+}
+
+//=====================================================
+
+void runCommandMode() {
+    AirportBST tree;
+    string line;
+
+    cout << endl << "Command mode. Type help for the commands, quit to go back." << endl;
+
+    while (true) {
+        cout << "> ";
+        if (!getline(cin, line)) {
+            cout << endl;
+            return;
+        }
+
+        vector<string> words = splitWords(line);
+        if ((int)words.size() == 0) {
+            continue;
+        }
+
+        string command = words[0];
+
+        if (command == "quit") {
+            return;
+        } else if (command == "help") {
+            printHelp();
+        } else if (command == "load" && (int)words.size() == 2) {
+            int loaded = 0;
+            int skipped = 0;
+            int duplicates = 0;
+            if (tree.loadTree(words[1], loaded, skipped, duplicates)) {
+                cout << "Loaded " << loaded << " airports (" << skipped
+                     << " lines skipped: no IATA code). Duplicates: " << duplicates << endl;
+                cout << "Height: " << tree.getHeight()
+                     << " Average depth: " << tree.getAverageDepth() << endl;
+            } else {
+                cout << "Cannot open " << words[1] << endl;
+            }
+        } else if (command == "find" && (int)words.size() == 2) {
+            tree.search(toUpperCode(words[1]));
+        } else if (command == "add" && (int)words.size() == 2) {
+            Airport a;
+            a.id = "\\N";
+            a.iata = toUpperCode(words[1]);
+
+            if (tree.searchQuiet(a.iata)) {
+                cout << a.iata << " already exists (rule I4), not added" << endl;
+            } else {
+                cout << "Name: ";
+                getline(cin, a.name);
+                cout << "City: ";
+                getline(cin, a.city);
+                cout << "Country: ";
+                getline(cin, a.country);
+
+                tree.insert(a);
+                cout << "Added " << a.iata << endl;
+                printValidate(tree);
+            }
+        } else if (command == "remove" && (int)words.size() == 2) {
+            tree.remove(toUpperCode(words[1]));
+            printValidate(tree);
+        } else if (command == "list") {
+            tree.printList();
+        } else if (command == "save" && (int)words.size() == 2) {
+            if (tree.saveTree(words[1])) {
+                cout << "Saved " << tree.getCount() << " airports in preorder to " << words[1] << endl;
+            } else {
+                cout << "Cannot write " << words[1] << endl;
+            }
+        } else if (command == "validate") {
+            printValidate(tree);
+        } else if (command == "range" && (int)words.size() == 3) {
+            tree.range(toUpperCode(words[1]), toUpperCode(words[2]));
+        } else if (command == "rebalance") {
+            tree.rebalance();
+            cout << "Height: " << tree.getHeight()
+                 << " Average depth: " << tree.getAverageDepth() << endl;
+        } else if (command == "levels") {
+            tree.printLevelOrder();
+        } else if (command == "stats") {
+            cout << "Airports: " << tree.getCount()
+                 << " Height: " << tree.getHeight()
+                 << " Average depth: " << tree.getAverageDepth() << endl;
+            cout << "Minimum code: " << tree.findMin()
+                 << " Maximum code: " << tree.findMax() << endl;
+        } else {
+            cout << "Unknown command or wrong number of words. Type help." << endl;
+        }
+    }
+}
+
+//=====================================================
+
+int main(int argc, char* argv[]) {
+    vector<string> lines;
+    string fileName = "";
+
+    // Find the data file
+    vector<string> paths;
+    if (argc > 1) {
+        paths.push_back(argv[1]);
+    }
+    paths.push_back("data/airports.dat");
+    paths.push_back("airports.dat");
+    paths.push_back("../data/airports.dat");
+    paths.push_back("../airports.dat");
+
+    for (int i = 0; i < (int)paths.size(); i++) {
+        if (fileName == "" && readFile(paths[i], lines)) {
+            fileName = paths[i];
+        }
+    }
+
+    while (fileName == "") {
+        cout << "Cannot find airports.dat. Type its full path (or q to quit): ";
+
+        string typed;
+        if (!getline(cin, typed)) {
+            cout << endl;
+            return 1;
+        }
+        typed = cleanPath(typed);
+
+        if (typed == "q") {
+            return 0;
+        }
+        if (readFile(typed, lines)) {
+            fileName = typed;
+        } else {
+            cout << "Cannot open " << typed << endl;
+        }
+    }
+
+    cout << "Data file: " << fileName << endl;
+
+    vector<Airport> airports;
+    int skipped = 0;
+    loadAirports(lines, airports, skipped);
+
+    string choice = "";
+
+    while (choice != "0") {
+        cout << endl << "Airport BST Project" << endl;
+        cout << "1. Task 1 - Load Data and Build BST" << endl;
+        cout << "2. Task 2 - Search" << endl;
+        cout << "3. Task 3 - Delete" << endl;
+        cout << "4. Task 4 - Traversals and Validation" << endl;
+        cout << "5. Task 5 - Range Queries" << endl;
+        cout << "6. Task 6 - Shape Experiment" << endl;
+        cout << "7. Command Mode (load, find, remove, range, validate, ...)" << endl;
+        cout << "0. Exit" << endl;
+        cout << "Enter task number: ";
+
+        string line;
+        if (!getline(cin, line)) {
+            cout << endl;
+            return 0;
+        }
+
+        vector<string> words = splitWords(line);
+        if ((int)words.size() == 0) {
+            continue;
+        }
+        choice = words[0];
+
+        if (choice == "1") {
+            runTask1(airports, (int)lines.size(), skipped);
+        } else if (choice == "2") {
+            runTask2(airports);
+        } else if (choice == "3") {
+            runTask3(airports);
+        } else if (choice == "4") {
+            runTask4(airports);
+        } else if (choice == "5") {
+            runTask5(airports);
+        } else if (choice == "6") {
+            runTask6(airports);
+        } else if (choice == "7") {
+            runCommandMode();
+        } else if (choice == "0") {
+            cout << "Exiting program." << endl;
+        } else {
+            cout << "Invalid choice." << endl;
+        }
+    }
+
+    return 0;
 }
